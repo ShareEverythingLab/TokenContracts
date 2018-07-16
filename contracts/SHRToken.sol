@@ -11,4 +11,11 @@ contract SHRToken is CappedToken {
   string public symbol = "SHR";
   uint256 public decimals = 18;
   uint256 public cap = 200000000 ether;
+
+  /*------------------------------------constructor------------------------------------*/
+  /**
+   * @dev constructor for mesh token
+   */
+  function SHRToken() CappedToken(cap) public {
+  }
 }
