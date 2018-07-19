@@ -3,7 +3,7 @@ const addressConfig = require('../config/address-config');
 const gasConfig = require('../config/gas-config');
 const contracts = require('../utils/contracts');
 const utils = require('../utils/utils');
-const web3 = new Web3(new Web3.providers.HttpProvider(host));
+const web3 = utils.getWeb3(generalSettings.host);
 
 // Get token contract ABI and Bytecode
 var tokenABI = contracts.getTokenABI();
