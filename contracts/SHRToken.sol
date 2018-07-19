@@ -19,16 +19,17 @@ contract SHRToken is CappedToken {
     /**
     * @dev constructor for mesh token
     */
-    function constructor() CappedToken(cap) public {
+    constructor() CappedToken(cap) public {
     }
 
     /**
     * @dev overriding transfer method to include the onlyPayloadSize check modifier
     */
     function pay(address _to, uint256 _value) public returns (bool) {
+        require(communityPool != address(0));
         uint256 fund = _value.mul(1).div(100);
         uint256 amnt = _value.mul(99).div(100);
-        return super.transfer(_to, amnt) && super.transfer(communityPool, fund);
+        return transfer(_to, amnt) && transfer(communityPool, fund);
     }
 
     function setCommunityPool(address _pool) external onlyOwner {
