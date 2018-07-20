@@ -25,14 +25,19 @@ contract('SHRToken', (accounts) => {
       return SHRToken.new().then(SHRToken => {
         return SHRToken.mint(accounts[0], 1000).then(() => {
           return SHRToken.pay(accounts[1], 1000).then(() => {
-            return Promise.all([
+              throw "should not be here";
+          })
+          .catch(error => {
+            const invalidPay = error.message.search('should not be here') >= 0;
+            assert.equal(invalidPay, false, 'should not be allowed pays by default');
+            Promise.all([
               SHRToken.balanceOf(accounts[0]),
               SHRToken.balanceOf(accounts[1])
             ]).then(results => {
-              assert.equal(results[0], 1000, 'sender account should still have its original balance');
-              assert.equal(results[1], 0, 'receiver account should still be at 0');
+              assert.equal(results[0], 1000, 'sender account should have a balance of 1000 now');
+              assert.equal(results[1], 0, 'receiver account should have a balance of 0 now');
             });
-          });
+          })
         });
       });
     });
