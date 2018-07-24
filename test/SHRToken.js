@@ -13,8 +13,21 @@ contract('SHRToken', (accounts) => {
     });
   });
 
-  describe('pay', () => {
+  describe('communityPool', () => {
+    /**
+     * Scenario:
+     * 1. Community pool address set and get
+     */
+    it('should set pool adddress', () => {
+      return SHRToken.new().then(SHRToken => {
+        return SHRToken.setCommunityPool(address[1]).then(() => {
+          assert.equal(SHRToken.getCommunityPool(), address[1], "Should set community pool address");
+        });
+      });
+    });
+  });
 
+  describe('transfer', () => {
     /**
      * Scenario:
      * 1. Token contract is deployed successfully.
@@ -24,7 +37,7 @@ contract('SHRToken', (accounts) => {
     it('should not allow pays by default', () => {
       return SHRToken.new().then(SHRToken => {
         return SHRToken.mint(accounts[0], 1000).then(() => {
-          return SHRToken.pay(accounts[1], 1000).then(() => {
+          return SHRToken.transfer(accounts[1], 1000).then(() => {
               throw "should not be here";
           })
           .catch(error => {
@@ -53,7 +66,7 @@ contract('SHRToken', (accounts) => {
       return SHRToken.new().then(SHRToken => {
         return SHRToken.mint(accounts[0], 1000).then(() => {
           return SHRToken.setCommunityPool(accounts[2]).then(() => {
-            return SHRToken.pay(accounts[1], 1000).then(() => {
+            return SHRToken.transfer(accounts[1], 1000).then(() => {
               return Promise.all([
                 SHRToken.balanceOf(accounts[0]),
                 SHRToken.balanceOf(accounts[1]),

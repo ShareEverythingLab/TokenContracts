@@ -20,6 +20,5 @@ for (let i = 0; i < mintingConfig.length; i++) {
         mintingConfig[i].address, 
         utils.convertEthToWei(mintingConfig[i].tokenAmountETH)
     );
+    console.log(`txHash: ${txHash}`);
 }
-
-console.log(`txHash: ${txHash}`);
