@@ -13,7 +13,7 @@ contract SHRToken is CappedToken {
     string public symbol = "SHR";
     uint256 public decimals = 18;
     uint256 public cap = 200000000 ether;
-    address private communityPool;
+    address public communityPool;
 
     /*------------------------------------constructor------------------------------------*/
     /**
@@ -25,9 +25,5 @@ contract SHRToken is CappedToken {
     function setCommunityPool(address _pool) external onlyOwner {
         require(_pool != address(0));
         communityPool = _pool;
-    }
-
-    function getCommunityPool() public returns (address) {
-        return communityPool;
     }
 }

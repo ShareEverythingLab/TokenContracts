@@ -44,7 +44,7 @@ contract SHROrder is Ownable {
     * @param endTime of the service
     * @return uint orderId of this contract
     */
-    function newOrder(address provider, address consumer, string recordId, string itemId, uint256 priceTotal, uint256 startTime, uint256 endTime) public returns (uint orderID) {
+    function newOrder(address provider, address consumer, string recordId, string itemId, uint256 priceTotal, uint256 startTime, uint256 endTime) public returns (uint256) {
         uint256 orderId = numOrders++; // orderId is return variable
         // Creates new struct and saves in storage. We leave out the mapping type.
         Orders[orderId] = Order(provider, consumer, recordId, itemId, priceTotal, startTime, endTime, 0, 0, 0);
@@ -52,6 +52,7 @@ contract SHROrder is Ownable {
         if (transfered){
             fundsReceived(orderId);
         }
+        return orderId;
     }
 
     /**
@@ -87,10 +88,10 @@ contract SHROrder is Ownable {
     function release(uint256 orderId) public returns (uint256) {
         Order storage o = Orders[orderId];
         require(checkOrderAndBalance(o, 0) == true);
-        require(token.getCommunityPool() != address(0));
+        require(token.communityPool() != address(0));
 
         uint256 amountFund = o.priceTotal.mul(1).div(100);
-        token.transfer(token.getCommunityPool(), amountFund);
+        token.transfer(token.communityPool(), amountFund);
         o.allocatedToFundPool = amountFund;
         o.tokenAllocated = 2;
 
@@ -109,14 +110,14 @@ contract SHROrder is Ownable {
         return amountPayable;
     }
 
-    function checkOrderAndBalance(Order order, int8 tokenAllocationStatus) private returns (bool) {
+    function checkOrderAndBalance(Order order, int8 tokenAllocationStatus) private view returns (bool) {
         require(order.tokenAllocated == tokenAllocationStatus);
         uint256 availableTokens = token.balanceOf(address(this));
         require (availableTokens >= order.priceTotal);
         return true;
     }
 
-    function getOrderTokenAllocationStatus(uint256 orderId) public returns (int8) {
+    function getOrderTokenAllocationStatus(uint256 orderId) public view returns (int8) {
         Order memory o = Orders[orderId];
         return o.tokenAllocated;
     }
