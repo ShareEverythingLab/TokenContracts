@@ -7,7 +7,7 @@ contract('SHROrder', (accounts) => {
     const provider = accounts[2];
     const recordId = 'r001';
     const itemId = 'i001';
-    const priceTotal = 10000;
+    const priceTotal = 1110;
     const getCurrentTime = () => Math.floor(Date.now() / 1000);
     const getContracts = () => {
         /**
@@ -42,7 +42,7 @@ contract('SHROrder', (accounts) => {
     describe('newOrder', () => {
         it('should not release empty order', () => {
             return getContracts().then(({ shrOrder, shrToken }) => {
-                shrOrder.release(0).then(_released => {
+                return shrOrder.release(0).then(_released => {
 
                 })
                 .catch(err => {
@@ -53,7 +53,7 @@ contract('SHROrder', (accounts) => {
 
         it('should not payout empty order', () => {
             return getContracts().then(({ shrOrder, shrToken }) => {
-                shrOrder.payout(0).then(_paid => {
+                return shrOrder.payout(0).then(_paid => {
 
                 })
                 .catch(err => {
@@ -68,15 +68,75 @@ contract('SHROrder', (accounts) => {
          */
         it('should create order', () => {
             return getContracts().then(({ shrOrder, shrToken }) => {
-                shrToken.mint(consumer, priceTotal).then( () => {
+                return shrToken.mint(consumer, priceTotal).then( () => {
                     const startTime = getCurrentTime();
                     const endTime = (startTime + 10000000);
-                    shrToken.approve(shrOrder.address, priceTotal, {from : consumer}).then( () => {
-                        shrOrder
+                    return shrToken.approve(shrOrder.address, priceTotal, {from : consumer}).then( () => {
+                        return shrOrder
                             .newOrder(provider, consumer, recordId, itemId, priceTotal, startTime, endTime)
                             .then(() => {
-                                shrOrder.numOrders().then(orderId => {
-                                assert.equal(orderId, 1, "Order should be created");
+                                return shrOrder.lastOrderIndex().then(orderId => {
+                                    assert.equal(orderId, 0, "Order should be created");
+                                    return shrOrder.getOrderPriceTotal(orderId).then(total => {
+                                        assert.equal(total, priceTotal, "Price total should match");
+                                    })
+                                });
+                            });
+                    });
+                });
+            });
+        });
+    });
+
+    describe('order operations', () => {
+        it('order can cancel', () => {
+            return getContracts().then(({ shrOrder, shrToken }) => {
+                return shrToken.mint(consumer, priceTotal).then( () => {
+                    const startTime = (getCurrentTime());
+                    const endTime = (startTime + 10000000);
+                    return shrToken.approve(shrOrder.address, priceTotal, {from : consumer}).then( () => {
+                        return shrOrder
+                        .newOrder(provider, consumer, recordId, itemId, priceTotal, startTime, endTime).then(() => {
+                            return shrToken.balanceOf(provider).then(originalBalance => {
+                                return shrOrder.lastOrderIndex().then(orderId => {
+                                    return shrOrder.cancel(orderId).then( () => {
+                                        return Promise.all([
+                                            shrOrder.getOrderTokenAllocationStatus(orderId),
+                                            shrToken.balanceOf(consumer)
+                                        ]).then( results => {
+                                            assert.equal(results[0], -1, 'order status should be cancelled');
+                                            assert.equal(results[1], priceTotal, 'consumer should have full refund');
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+
+        it('released order should allocate to fund', () => {
+            return getContracts().then(({ shrOrder, shrToken }) => {
+                return shrToken.mint(consumer, priceTotal).then( () => {
+                    const startTime = getCurrentTime();
+                    const endTime = (startTime + 10000000);
+                    return shrToken.approve(shrOrder.address, priceTotal, {from : consumer}).then( () => {
+                        return shrOrder
+                            .newOrder(provider, consumer, recordId, itemId, priceTotal, startTime, endTime)
+                            .then(() => {
+                                return shrOrder.lastOrderIndex().then(orderId => {
+                                    return shrOrder.release(orderId).then( () => {
+                                        return shrOrder.getOrderAllocatedToFundPool(orderId).then(fund => {
+                                            assert.equal(fund, Math.round(priceTotal / 100), "1% used for fund");
+                                            return shrOrder.getOrderTokenAllocationStatus(orderId).then(status => {
+                                                assert.equal(status, 2, 'order token status should be released');
+                                                return shrToken.balanceOf(communityPool).then(poolBalance => {
+                                                    assert.equal(poolBalance, Math.round(priceTotal / 100), 'pool should get 1%');
+                                                });
+                                            });
+                                        });
+                                    });
                                 });
                             });
                     });
@@ -84,6 +144,36 @@ contract('SHROrder', (accounts) => {
             });
         });
 
-    });
+        it('payout order', () => {
+            return getContracts().then(({ shrOrder, shrToken }) => {
+                return shrToken.mint(consumer, priceTotal).then( () => {
+                    const startTime = getCurrentTime();
+                    const endTime = (startTime + 10000000);
+                    return shrToken.approve(shrOrder.address, priceTotal, {from : consumer}).then( () => {
+                        return shrOrder
+                        .newOrder(provider, consumer, recordId, itemId, priceTotal, startTime, endTime).then(() => {
+                            return shrOrder.lastOrderIndex().then(orderId => {
+                                return shrOrder.release(orderId).then( () => {
+                                    return shrOrder.payout(orderId).then( () => {
+                                        return Promise.all([
+                                            shrOrder.getOrderTokenAllocationStatus(orderId),
+                                            shrToken.balanceOf(consumer),
+                                            shrToken.balanceOf(provider),
+                                            shrToken.balanceOf(communityPool)
+                                        ]).then( results => {
+                                            assert.equal(results[0], 3, 'order status should be cancelled');
+                                            assert.equal(results[1], 0, 'consumer should have used all tokens');
+                                            assert.equal(results[2], Math.round(priceTotal/100*99), 'provider should have 99% tokens');
+                                            assert.equal(results[3], Math.round(priceTotal/100), 'consumer should have 1% tokens');
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            }); 
+        });
+    })
 
 });

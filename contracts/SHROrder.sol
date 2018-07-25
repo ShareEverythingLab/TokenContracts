@@ -25,12 +25,16 @@ contract SHROrder is Ownable {
         uint256 allocatedToPayable; // accounts payable allocation, record when transfer is made
     }
 
-    uint256 public numOrders = 0;
-    mapping (uint256 => Order) Orders;
+    uint256 public lastOrderIndex = 0;
+    Order[] private Orders;
 
     constructor(SHRToken _tokenContract) public {
         // storing constructor
         token = _tokenContract;
+    }
+
+    function totalOrders() public view returns (uint256) {
+        return Orders.length;
     }
 
     /**
@@ -45,14 +49,15 @@ contract SHROrder is Ownable {
     * @return uint orderId of this contract
     */
     function newOrder(address provider, address consumer, string recordId, string itemId, uint256 priceTotal, uint256 startTime, uint256 endTime) public returns (uint256) {
-        uint256 orderId = numOrders++; // orderId is return variable
         // Creates new struct and saves in storage. We leave out the mapping type.
-        Orders[orderId] = Order(provider, consumer, recordId, itemId, priceTotal, startTime, endTime, 0, 0, 0);
+        Order memory order = Order(provider, consumer, recordId, itemId, priceTotal, startTime, endTime, 0, 0, 0);
+        Orders.push(order);
+        lastOrderIndex = Orders.length.sub(1);
         bool transfered = token.transferFrom(consumer, address(this), priceTotal);
         if (transfered){
-            fundsReceived(orderId);
+            fundsReceived(lastOrderIndex);
         }
-        return orderId;
+        return lastOrderIndex;
     }
 
     /**
@@ -71,7 +76,7 @@ contract SHROrder is Ownable {
     */
     function cancel(uint256 orderId) public returns (bool) {
         Order storage o = Orders[orderId];
-        require(checkOrderAndBalance(o, 0) == true);
+        require(checkOrderAndBalance(o, 1) == true);
 
         token.transfer(o.consumer, o.priceTotal);
         o.tokenAllocated = -1;
@@ -87,7 +92,7 @@ contract SHROrder is Ownable {
     */
     function release(uint256 orderId) public returns (uint256) {
         Order storage o = Orders[orderId];
-        require(checkOrderAndBalance(o, 0) == true);
+        require(checkOrderAndBalance(o, 1) == true);
         require(token.communityPool() != address(0));
 
         uint256 amountFund = o.priceTotal.mul(1).div(100);
@@ -120,5 +125,20 @@ contract SHROrder is Ownable {
     function getOrderTokenAllocationStatus(uint256 orderId) public view returns (int8) {
         Order memory o = Orders[orderId];
         return o.tokenAllocated;
+    }
+
+    function getOrder(uint256 orderId) public view returns (address, address, string, string, uint256, uint256, uint256, int8, uint256, uint256) {
+        Order memory o = Orders[orderId];
+        return (o.provider, o.consumer, o.recordId, o.itemId, o.priceTotal, o.startTime, o.endTime, o.tokenAllocated, o.allocatedToFundPool, o.allocatedToPayable);
+    }
+
+    function getOrderPriceTotal(uint256 orderId) public view returns (uint256) {
+        Order memory o = Orders[orderId];
+        return o.priceTotal;
+    }
+
+    function getOrderAllocatedToFundPool(uint256 orderId) public view returns (uint256) {
+        Order memory o = Orders[orderId];
+        return o.allocatedToFundPool;
     }
 }

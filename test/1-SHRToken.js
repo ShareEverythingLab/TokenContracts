@@ -38,8 +38,8 @@ contract('SHRToken', (accounts) => {
      */
     it('should allow pays by default', () => {
       return SHRToken.new().then(SHRToken => {
-        return SHRToken.mint(accounts[0], 1000).then(() => {
-          return SHRToken.transfer(accounts[1], 1000).then(() => {
+        return SHRToken.mint(accounts[0], 5).then(() => {
+          return SHRToken.transfer(accounts[1], 5).then(() => {
               throw "transfer passed";
           })
           .catch(error => {
@@ -49,7 +49,7 @@ contract('SHRToken', (accounts) => {
               SHRToken.balanceOf(accounts[1])
             ]).then(results => {
               assert.equal(results[0], 0, 'receiver account should have a balance of 0 now');
-              assert.equal(results[1], 1000, 'sender account should have a balance of 1000 now');
+              assert.equal(results[1], 5, 'sender account should have a balance of 5 now');
             });
           })
         });
