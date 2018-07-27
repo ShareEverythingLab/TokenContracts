@@ -16,9 +16,13 @@ web3.eth.defaultAccount = addressConfig.ownerAddress;
 const mintingConfig = require('../config/minting-config')
 
 for (let i = 0; i < mintingConfig.length; i++) {
-    const txHash = TokenInstance.mint(
+    const txHash = TokenInstance.methods.mint(
         mintingConfig[i].address, 
         utils.convertEthToWei(mintingConfig[i].tokenAmountETH)
-    );
-    console.log(`txHash: ${txHash}`);
+    ).send({
+        from: addressConfig.ownerAddress,
+        gas: gasConfig.methodGas
+      }).then((txHash) => {
+        console.log(`txHash: ${txHash.transactionHash}`);
+    });
 }

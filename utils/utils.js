@@ -5,7 +5,7 @@ const config = require('../config/general-settings');
 const getWeb3 = host => new Web3(new Web3.providers.HttpProvider(host));
 const web3 = getWeb3(config.host);
 
-const convertEthToWei = n => new web3.BigNumber(web3.toWei(n, 'ether'));
+const convertEthToWei = n => web3.utils.toWei(n, 'ether');
 
 const duration = {
   seconds: val => val,
@@ -25,8 +25,7 @@ const tokenJsonFile = '../build/contracts/SHRToken.json';
 
 const getTokenContract = (_web3, contractAddress) => {
   const jsonContent = getJson(tokenJsonFile);
-  const Token = _web3.eth.contract(jsonContent.abi);
-  return Token.at(contractAddress);
+  return new _web3.eth.Contract(jsonContent.abi, contractAddress);
 }
 
 module.exports = {

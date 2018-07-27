@@ -9,25 +9,29 @@ const web3 = utils.getWeb3(generalSettings.host);
 var tokenABI = contracts.getTokenABI();
 var tokenBytecode = contracts.getTokenBytecode();
 
-// Deploy token contract
-var TokenContract = web3.eth.contract(tokenABI);
-var TokenInstance = TokenContract.new({
-        data: tokenBytecode, 
-        from: addressConfig.ownerAddress, 
-        gas: gasConfig.deployGas
-    });
-
-console.log("Token Contract is creating at: " + TokenInstance.transactionHash);
-
 // Get order contract ABI and Bytecode
 var orderABI = contracts.getOrderABI();
 var orderBytecode = contracts.getOrderBytecode();
-// Deploy order contract
-var OrderContract = web3.eth.contract(orderABI);
-var OrderInstance = OrderContract.new({
-        data: orderBytecode, 
-        from: addressConfig.ownerAddress, 
-        gas: gasConfig.deployGas
-    });
 
-console.log("Order Contract is creating at: " + OrderInstance.transactionHash);
+// Deploy token contract
+var TokenContract = new web3.eth.Contract(tokenABI);
+TokenContract.deploy({
+    data: tokenBytecode
+}).send({
+    from: addressConfig.ownerAddress,
+    gas: gasConfig.deployGas
+}).then((TokenInstance) => {
+    console.log("Token Contract is: " + TokenInstance.options.address);
+
+    // Deploy order contract
+    var OrderContract = new web3.eth.Contract(orderABI);
+    OrderContract.deploy({
+        data: orderBytecode,
+        arguments: [TokenInstance.options.address]
+    }).send({
+        from: addressConfig.ownerAddress,
+        gas: gasConfig.deployGas
+    }).then((OrderInstance) => {
+        console.log("Order Contract is: " + OrderInstance.options.address);
+    });
+});

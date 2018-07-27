@@ -29,6 +29,7 @@
     "truffle": "4.1.13",
     "truffle-flattener": "1.2.0",
     "type-of-is": "^3.5.1",
-    "zeppelin-solidity": "1.10.0"
+    "zeppelin-solidity": "1.10.0",
+    "web3": "1.0.0-beta.35"
   }
 }
