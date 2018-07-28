@@ -12,6 +12,8 @@ contract SHROrder is Ownable {
 
     SHRToken public token;
 
+    event OrderCreated(uint orderId, string recordId);
+
     struct Order {
         address provider;
         address consumer;
@@ -57,6 +59,7 @@ contract SHROrder is Ownable {
         if (transfered){
             fundsReceived(lastOrderIndex);
         }
+        emit OrderCreated(lastOrderIndex, recordId);
         return lastOrderIndex;
     }
 
