@@ -22,13 +22,28 @@ contract SHROrder is Ownable {
         uint256 priceTotal;
         uint256 startTime;
         uint256 endTime;
-        int8 tokenAllocated; // -1 = cancelled, 0 = none, 1 = received & holding, 2 = holding released, 3 = paid out
-        uint256 allocatedToFundPool; // community fund allocation, record when transfer is made
-        uint256 allocatedToPayable; // accounts payable allocation, record when transfer is made
+        CancellationPolicyOption policyOption;
+        AllocationStatus tokenAllocated;
+        uint256 allocatedToFundPool;// amount to community fund allocation
+        uint256 allocatedToPayable; // amount to accounts payable allocation
     }
 
     uint256 public lastOrderIndex = 0;
     Order[] private Orders;
+
+    enum CancellationPolicyOption { 
+        None,   // Undefined status
+        Day,    // Allows cancel and full refund prior to 24hr of startTime
+        Week,   // Allows cancel and full refund prior to 7 days of startTime
+        Month   // Allows cancel and full refund prior to 30 days of startTime
+    }
+    enum AllocationStatus {
+        Initiated,
+        Cancelled,
+        Holding,
+        Released,
+        Paid
+    }
 
     constructor(SHRToken _tokenContract) public {
         // storing constructor
@@ -50,9 +65,19 @@ contract SHROrder is Ownable {
     * @param endTime of the service
     * @return uint orderId of this contract
     */
-    function newOrder(address provider, address consumer, string recordId, string itemId, uint256 priceTotal, uint256 startTime, uint256 endTime) public returns (uint256) {
+    function newOrder(
+            address provider, 
+            address consumer, 
+            string recordId, 
+            string itemId, 
+            uint256 priceTotal, 
+            uint256 startTime, 
+            uint256 endTime
+        ) public returns (uint256) 
+    {
+        
         // Creates new struct and saves in storage. We leave out the mapping type.
-        Order memory order = Order(provider, consumer, recordId, itemId, priceTotal, startTime, endTime, 0, 0, 0);
+        Order memory order = Order(provider, consumer, recordId, itemId, priceTotal, startTime, endTime, CancellationPolicyOption.None, AllocationStatus.Initiated, 0, 0);
         Orders.push(order);
         lastOrderIndex = Orders.length.sub(1);
         bool transfered = token.transferFrom(consumer, address(this), priceTotal);
@@ -62,27 +87,46 @@ contract SHROrder is Ownable {
         emit OrderCreated(lastOrderIndex, recordId);
         return lastOrderIndex;
     }
-
-    /**
-    * @dev set Order's tokenAllocated flag to 1
-    * @param orderId of this contract
-    */
-    function fundsReceived(uint orderId) private {
+    
+    function setCancellationPolicyOption(uint256 orderId, CancellationPolicyOption policyOptionId) public{
         Order storage o = Orders[orderId];
-        o.tokenAllocated = 1;
+        require(checkOrderAndBalance(o, AllocationStatus.Holding) == true);
+        require(o.policyOption == CancellationPolicyOption.None);
+
+        o.policyOption = policyOptionId;
     }
 
     /**
-    * @dev Cancel an Order and refund all tokens 
+    * @dev Cancel an Order in its HOLDING status 
+    *  and refund all tokens 
     * @param orderId of this contract
     * @return boolean of success
     */
-    function cancel(uint256 orderId) public returns (bool) {
+    function cancelHold(uint256 orderId) public returns (bool) {
         Order storage o = Orders[orderId];
-        require(checkOrderAndBalance(o, 1) == true);
+        require(checkOrderAndBalance(o, AllocationStatus.Holding) == true);
 
         token.transfer(o.consumer, o.priceTotal);
-        o.tokenAllocated = -1;
+        o.tokenAllocated = AllocationStatus.Cancelled;
+
+        return true;
+    }
+
+    /**
+    * @dev Cancel an Order after HOLD RELEASED 
+    *  and refund according to cancellation policy 
+    * @param orderId of this contract
+    * @return boolean of success
+    */
+    function cancelOrder(uint256 orderId) public returns (bool) {
+        Order storage o = Orders[orderId];
+        require(o.tokenAllocated == AllocationStatus.Released);
+        require(checkOrderCanCancel(o));
+        uint256 amountToRefund = o.priceTotal.sub(o.allocatedToFundPool);
+        require(token.balanceOf(address(this)) >= amountToRefund);
+
+        token.transfer(o.consumer, amountToRefund);
+        o.tokenAllocated = AllocationStatus.Cancelled;
 
         return true;
     }
@@ -95,17 +139,22 @@ contract SHROrder is Ownable {
     */
     function release(uint256 orderId) public returns (uint256) {
         Order storage o = Orders[orderId];
-        require(checkOrderAndBalance(o, 1) == true);
+        require(checkOrderAndBalance(o, AllocationStatus.Holding) == true);
         require(token.communityPool() != address(0));
 
         uint256 amountFund = o.priceTotal.mul(1).div(100);
         token.transfer(token.communityPool(), amountFund);
         o.allocatedToFundPool = amountFund;
-        o.tokenAllocated = 2;
+        o.tokenAllocated = AllocationStatus.Released;
 
         return amountFund;
     }
 
+    /**
+    * @dev Transfer payable amount to provider
+    * @param orderId of the Order
+    * @return amount allocated to provider wallet
+    */
     function payout(uint256 orderId) public returns (uint256) {
         Order storage o = Orders[orderId];
         uint256 amountPayable = o.priceTotal.sub(o.allocatedToFundPool);
@@ -113,24 +162,19 @@ contract SHROrder is Ownable {
 
         token.transfer(o.provider, amountPayable);
         o.allocatedToPayable = amountPayable;
-        o.tokenAllocated = 3;
+        o.tokenAllocated = AllocationStatus.Paid;
 
         return amountPayable;
     }
 
-    function checkOrderAndBalance(Order order, int8 tokenAllocationStatus) private view returns (bool) {
-        require(order.tokenAllocated == tokenAllocationStatus);
-        uint256 availableTokens = token.balanceOf(address(this));
-        require (availableTokens >= order.priceTotal);
-        return true;
-    }
-
-    function getOrderTokenAllocationStatus(uint256 orderId) public view returns (int8) {
+/** Order property getters */
+/***************************/
+    function getOrderTokenAllocationStatus(uint256 orderId) public view returns (AllocationStatus) {
         Order memory o = Orders[orderId];
         return o.tokenAllocated;
     }
 
-    function getOrder(uint256 orderId) public view returns (address, address, string, string, uint256, uint256, uint256, int8, uint256, uint256) {
+    function getOrder(uint256 orderId) public view returns (address, address, string, string, uint256, uint256, uint256, AllocationStatus, uint256, uint256) {
         Order memory o = Orders[orderId];
         return (o.provider, o.consumer, o.recordId, o.itemId, o.priceTotal, o.startTime, o.endTime, o.tokenAllocated, o.allocatedToFundPool, o.allocatedToPayable);
     }
@@ -143,5 +187,62 @@ contract SHROrder is Ownable {
     function getOrderAllocatedToFundPool(uint256 orderId) public view returns (uint256) {
         Order memory o = Orders[orderId];
         return o.allocatedToFundPool;
+    }
+
+    function getOrderCancellationPolicy(uint256 orderId) public view returns (CancellationPolicyOption) {
+        Order memory o = Orders[orderId];
+        return o.policyOption;
+    }
+
+/** Internal Functions */
+/***********************/
+    /**
+    * @dev Internal func to set Order's tokenAllocated flag to 1
+    * @param orderId of this contract
+    */
+    function fundsReceived(uint256 orderId) private {
+        Order storage o = Orders[orderId];
+        o.tokenAllocated = AllocationStatus.Holding;
+    }
+
+    /**
+    * @dev Internal func to check Contract holds sufficient balance and Order is presumed status
+    * @param order to check
+    * @param tokenAllocationStatus required of the order to check
+    * @return boolean
+    */
+    function checkOrderAndBalance(Order order, AllocationStatus tokenAllocationStatus) private view returns (bool) {
+        require(order.tokenAllocated == tokenAllocationStatus);
+        uint256 availableTokens = token.balanceOf(address(this));
+        require (availableTokens >= order.priceTotal);
+        return true;
+    }
+
+    /**
+    * @dev Check if Order can be cancelled according to CancellationPolicyOption
+    * @param order to check
+    * @return boolean
+    */
+    function checkOrderCanCancel(Order order) private view returns (bool) {
+        uint256 cancellationTimeRestraint = 0;
+        if (order.policyOption == CancellationPolicyOption.None){
+            cancellationTimeRestraint = 0;
+        }
+        else if (order.policyOption == CancellationPolicyOption.Day){
+            cancellationTimeRestraint = 86400;
+        }
+        else if (order.policyOption == CancellationPolicyOption.Week){
+            cancellationTimeRestraint = 604800;
+        }
+        else if (order.policyOption == CancellationPolicyOption.Month){
+            cancellationTimeRestraint = 2592000;
+        }
+        else {
+            return false;
+        }
+        // Order StartTime need to be after now + policy time
+        require( order.startTime > (block.timestamp + cancellationTimeRestraint) );
+
+        return true;
     }
 }
