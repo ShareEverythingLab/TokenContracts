@@ -26,3 +26,10 @@ for (let i = 0; i < mintingConfig.length; i++) {
         console.log(`txHash: ${txHash.transactionHash}`);
     });
 }
+
+TokenInstance.methods.setCommunityPool(addressConfig.poolAddress).send({
+    from: addressConfig.ownerAddress,
+    gas: gasConfig.methodGas
+  }).then((txHash) => {
+    console.log(`txHash: ${txHash.transactionHash}`);
+});
