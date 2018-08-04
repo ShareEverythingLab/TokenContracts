@@ -174,9 +174,21 @@ contract SHROrder is Ownable {
         return o.tokenAllocated;
     }
 
-    function getOrder(uint256 orderId) public view returns (address, address, string, string, uint256, uint256, uint256, AllocationStatus, uint256, uint256) {
+    function getOrder(uint256 orderId) public view returns (address,address,string,string,uint256,uint256,uint256,CancellationPolicyOption,AllocationStatus,uint256,uint256) {
         Order memory o = Orders[orderId];
-        return (o.provider, o.consumer, o.recordId, o.itemId, o.priceTotal, o.startTime, o.endTime, o.tokenAllocated, o.allocatedToFundPool, o.allocatedToPayable);
+        return (
+            o.provider,
+            o.consumer,
+            o.recordId,
+            o.itemId,
+            o.priceTotal,
+            o.startTime,
+            o.endTime,
+            o.policyOption,
+            o.tokenAllocated,
+            o.allocatedToFundPool,
+            o.allocatedToPayable
+        );
     }
 
     function getOrderPriceTotal(uint256 orderId) public view returns (uint256) {
